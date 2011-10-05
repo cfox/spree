@@ -6,6 +6,7 @@ module Scopes::Product
     :taxon => {
       :taxons_name_eq => [:taxon_name],
       :in_taxons => [:taxon_names],
+      :in_all_taxons => [:taxon_names]
     },
     # product selection based on name, or search
     :search => {
@@ -103,6 +104,15 @@ module Scopes::Product
   Product.scope :in_taxons, lambda {|*taxons|
     taxons = get_taxons(taxons)
     taxons.first ? prepare_taxon_conditions(taxons) : {}
+  }
+
+  # This scope selects products which belong to ALL of the taxons directly.
+  #
+  #  Product.in_all_taxons([x,y])
+  #
+  Product.scope :in_all_taxons, lambda {|*taxons|
+    taxons = get_taxons(taxons)
+    taxons.first ? prepare_all_taxon_conditions(taxons) : {}
   }
 
   # for quick access to products in a group, WITHOUT using the association mechanism
@@ -262,5 +272,18 @@ SQL
   def self.prepare_taxon_conditions(taxons)
     ids = taxons.map{|taxon| taxon.self_and_descendants.map(&:id)}.flatten.uniq
     { :joins => :taxons, :conditions => ["taxons.id IN (?)", ids] }
+  end
+
+  def self.prepare_all_taxon_conditions(taxons)
+    ids = taxons.map(&:id).uniq
+    { :joins => <<SQL
+       JOIN (
+       SELECT products_taxons.product_id AS product_id, COUNT(1)
+       FROM products_taxons
+       WHERE taxon_id IN (#{ids.join(',')})
+       GROUP BY product_id HAVING COUNT(1) = #{ids.size}
+       ) all_taxons ON products.id = all_taxons.product_id
+SQL
+    }
   end
 end
