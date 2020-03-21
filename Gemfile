@@ -1,6 +1,6 @@
 source 'http://rubygems.org'
 
-gem 'json'
+gem 'json', '>= 2.3.0'
 gem 'sqlite3'
 # Gems used only for assets and not required
 # in production environments by default.
